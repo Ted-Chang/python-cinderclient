@@ -1477,3 +1477,69 @@ def do_attachment_delete(cs, args):
     """Delete an attachment for a cinder volume."""
     for attachment in args.attachment:
         cs.attachments.delete(attachment)
+
+
+@api_versions.wraps('3.28')
+@utils.arg('--all-tenants',
+           dest='all_tenants',
+           metavar='<0|1>',
+           nargs='?',
+           type=int,
+           const=1,
+           default=0,
+           help='Shows details for all tenants. Admin only.')
+@utils.arg('--name',
+           metavar='<name>',
+           default=None,
+           help='Filters results by a name. Default=None.')
+@utils.arg('--marker',
+           metavar='<marker>',
+           default=None,
+           help='Begin returning volumes that appear later in the volume '
+           'list than that represented by this volume id. '
+           'Default=None.')
+@utils.arg('--limit',
+           metavar='<limit>',
+           default=None,
+           help='Maximum number of volumes to return. Default=None.')
+@utils.arg('--sort',
+           metavar='<key>[:<direction>]',
+           default=None,
+           help=(('Comma-separated list of sort keys and directions in the '
+                  'form of <key>[:<asc|desc>]. '
+                  'Valid keys: %s. '
+                  'Default=None.') % ', '.join(base.SORT_KEY_VALUES)))
+@utils.arg('--tenant',
+           type=str,
+           dest='tenant',
+           nargs='?',
+           metavar='<tenant>',
+           help='Display information from single tenant (Admin only).')
+def do_diskusage(cs, args):
+    """Lists all volumes' disk usage."""
+    all_tenants = 1 if args.tenant else \
+                  int(os.environ.get("ALL_TENANTS", args.all_tenants))
+    search_opts = {
+        'all_tenants': all_tenants,
+        'project_id': args.tenant,
+        'name': args.name,
+    }
+
+    volumes = cs.volumes.disk_usage(search_opts=search_opts, marker=args.marker,
+                                    limit=args.limit, sort_key=None,
+                                    sort_dir=None, sort=args.sort)
+    shell_utils.translate_volume_keys(volumes)
+
+    key_list = ['ID', 'Status', 'Name', 'Size', 'Volume Type',
+                'Bootable', 'Attached to', 'Disk Usage']
+    # If all_tenants is specified, print
+    # Tenant ID as well.
+    if search_opts['all_tenants']:
+        key_list.insert(1, 'Tenant ID')
+
+    if args.sort:
+        sortby_index = None
+    else:
+        sortby_index = 0
+        utils.print_list(volumes, key_list, exclude_unavailable=True,
+                         sortby_index=sortby_index)

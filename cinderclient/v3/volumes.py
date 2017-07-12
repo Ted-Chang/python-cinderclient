@@ -18,6 +18,7 @@ from cinderclient.apiclient import base as common_base
 from cinderclient import api_versions
 from cinderclient import base
 from cinderclient.v2 import volumes
+from cinderclient import utils
 
 
 class Volume(volumes.Volume):
@@ -176,3 +177,19 @@ class VolumeManager(volumes.VolumeManager):
                                    search_opts={'host': host}, marker=marker,
                                    limit=limit, offset=offset, sort=sort)
         return self._list(url, "manageable-volumes")
+
+    @api_versions.wraps("3.28")
+    def disk_usage(self, search_opts=None, marker=None, limit=None,
+                   sort_key=None, sort_dir=None, sort=None):
+        """
+        Get a list of disk usage for all volumes.
+        """
+        if search_opts is None:
+            search_opts = {}
+
+        if limit:
+            search_opts['limit'] = limit
+
+        query_string = utils.build_query_param(search_opts, True)
+
+        return self._list("/volumes/diskusage%s" % query_string, "volumes")
